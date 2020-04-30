@@ -1,19 +1,23 @@
 import re
-import random
+from random import choices
 
 dictionary = []
-with open("words_alpha.txt") as f:
+with open("words_list.txt") as f:
     dictionary = [line.rstrip() for line in f]
 
 
 number_regex = r"1?-?\d{3}-?\d{3}-?\d{4}"
 numword_regex = r""
-numpad = { "2": ["A", "B", "C"], "3": ["D", "E", "F"], "4": ["G", "H", "I"] }
-numpad["5"] = ["J", "K", "L"]
-numpad["6"] = ["M", "N", "O"]
-numpad["7"] = ["P", "Q", "R", "S"]
-numpad["8"] = ["T", "U", "V"]
-numpad["9"] = ["W", "X", "Y", "Z"]
+numpad = { "2": [("A", 7.93, 6.31, 8.497), ("B", 3.86, 0.15, 1.492), ("C", 8.50, 5.07, 2.202)]}
+numpad["3"] = [("D", 4.13, 3.11, 4.253), ("E", 4.09, 20.03, 11.162), ("F", 2.81, 0.19, 2.228)]
+numpad["4"] = [("G", 2.95, 0.90, 2.015), ("H", 3.75, 2.14, 6.094), ("I", 3.38, 0.30, 7.546)]
+numpad["5"] = [("J", 0.98, 0, 0.153), ("K", 1.32, 0.91, 1.292), ("L", 3.30, 4.81, 4.025)]
+numpad["6"] = [("M", 5.90, 6.95, 2.406), ("N", 2.28, 8.26, 2.406), ("O", 3.38, 0.95, 7.507)]
+numpad["7"] = [("P", 11.53, 0.46, 1.929), ("Q", 1.56, 0, 0.095), ("R", 3.43, 6.01, 7.587), ("S", 10.45, 12.51, 6.327)]
+numpad["8"] = [("T", 6.14, 7.22, 9.356), ("U", 1.21, 0.22, 2.758), ("V", 2.66, 0, 0.978)]
+numpad["9"] = [("W", 1.93, 0.28, 2.560), ("X", 0.61, 0.39, 0.150), ("Y", 0.48, 12.79, 1.994), ("Z", 1.43, 0.03, 0.077)]
+numpad["1"] = [("-1-", 1, 1, 1)]
+numpad["0"] = [("-0-", 1, 1, 1)]
 
 num_lookup = {"A": "2", "B": "2", "C": "2", "D": "3", "E": "3", "F": "3", "G": "4"}
 num_lookup["H"] = "4"
@@ -42,30 +46,50 @@ class InvalidNumberException(Exception):
 
 def number_to_words(number):
     check_numberstring(number)
-    peeled = number[4:]
-    """
+    peeled = re.sub("-", "", number)[4:]
     global dictionary
     new_word = ""
-    running, chances, dash_count = (True, 3, 0)
+    maxchances = 100
+    running, chances, dash_count = (True, maxchances, 0)
     while running:
+        if len(peeled) == 0:
+            break
         for i in range(len(peeled)):
             digit = peeled[i]
             if digit == "-":
                 dash_count += 1
                 continue
-            random_letter = random.choice(numpad[digit])
-            new_word.join(random_letter)
-        if new_word is not in dictionary:
+            list = numpad[digit]
+            result = get_relative_freq(list, i, len(peeled))
+            random_letter = result
+            #print(*random_letter)
+            new_word += random_letter[0]
+        print(new_word)
+        if new_word not in dictionary:
             chances -= 1
-            if chances == 0: #gives a couple chances to find words of this size
-                chances = 3
+            new_word = ""
+            if chances == 0:
+                #gives a couple chances to find words of this size
+                chances = maxchances
                 peeled = peeled[1:]
             continue
-        end = getformat(number, new_word)
-    return number[:end].join(new_word)
-    """
+        else:
+            end = get_word_format(number, new_word)
+            return end
+
+def get_relative_freq(tuple_list, index, length):
+    set = None
+    if index == 0:
+        set = [(letter, start) for letter, start, end, contain in tuple_list]
+    elif index == length-1:
+        set = [(letter, end) for letter, start, end, contain in tuple_list]
+    else:
+        set = [(letter, contain) for letter, start, end, contain in tuple_list]
+    letters, freqs = zip(*set)
+    return choices(letters, weights=freqs)
 
 def words_to_numbers(worded_number):
+    #put check to confirm input is valid
     number = re.sub("-", "", worded_number)
     number = number.upper()
     replaced = ""
@@ -83,7 +107,6 @@ def words_to_numbers(worded_number):
 
     return result
 
-
 def all_wordifications(string):
     string = check_numberstring(number)
     pass
@@ -92,7 +115,7 @@ def check_numberstring(string):
     """
     Checks if the parameter is valid and returns it with all dashes out
     """
-    match = re.search(regex, string)
+    match = re.search(number_regex, string)
     if match is None:
         match = re.search(numword_regex, string)
         if match is None:
@@ -101,7 +124,7 @@ def check_numberstring(string):
     return re.sub("-", "", matched_group)
 
 def get_word_format(oldnum, newword):
-    length = len(newnum)
+    length = len(newword)
     if length >= 5:
         # 0123456789ABCD
         # 1-800-724-6837
@@ -109,7 +132,7 @@ def get_word_format(oldnum, newword):
         # 1-800-72-INTER
         length += 1
     slice_index = len(oldnum) - length
-    oldnum[:slice_index].join("-"+newword)
+    return oldnum[:slice_index]+"-"+newword
 
 running = True
 while running:
