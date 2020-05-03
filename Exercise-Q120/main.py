@@ -8,6 +8,8 @@ with open("words_list.txt") as f:
 
 number_regex = r"1?-?\d{3}-?\d{3}-?\d{4}"
 numword_regex = r""
+#frequencies courtesy of (http://phrontistery.info/ihlstats.html#table2)
+#and (https://en.wikipedia.org/wiki/Letter_frequency)
 numpad = { "2": [("A", 7.93, 6.31, 8.497), ("B", 3.86, 0.15, 1.492), ("C", 8.50, 5.07, 2.202)]}
 numpad["3"] = [("D", 4.13, 3.11, 4.253), ("E", 4.09, 20.03, 11.162), ("F", 2.81, 0.19, 2.228)]
 numpad["4"] = [("G", 2.95, 0.90, 2.015), ("H", 3.75, 2.14, 6.094), ("I", 3.38, 0.30, 7.546)]
@@ -45,15 +47,16 @@ class InvalidNumberException(Exception):
         pass
 
 def number_to_words(number):
-    check_numberstring(number)
-    peeled = re.sub("-", "", number)[4:]
+    valid = check_numberstring(number)
+    peeled = valid[4:]
     global dictionary
     new_word = ""
     maxchances = 100
     running, chances, dash_count = (True, maxchances, 0)
     while running:
         if len(peeled) == 0:
-            break
+            print("\tWas unable to find a suitable solution. Please try again.\n")
+            return ""
         for i in range(len(peeled)):
             digit = peeled[i]
             if digit == "-":
@@ -64,7 +67,7 @@ def number_to_words(number):
             random_letter = result
             #print(*random_letter)
             new_word += random_letter[0]
-        print(new_word)
+        #print(new_word)
         if new_word not in dictionary:
             chances -= 1
             new_word = ""
@@ -74,7 +77,7 @@ def number_to_words(number):
                 peeled = peeled[1:]
             continue
         else:
-            end = get_word_format(number, new_word)
+            end = get_word_format(valid, new_word)
             return end
 
 def get_relative_freq(tuple_list, index, length):
@@ -108,8 +111,37 @@ def words_to_numbers(worded_number):
     return result
 
 def all_wordifications(string):
-    string = check_numberstring(number)
-    pass
+    wordifications = set()
+    #array of (index, char) tuples
+    cleaned = re.sub("-", "", string)
+    digit_arr = [ char for char in cleaned ]
+    print(digit_arr)
+    #iterate through list and
+    start = 4
+    end = len(digit_arr)
+    size = end
+    while size > 0:
+        rangefinder = end - size + 1
+        for i in range(rangefinder):
+            permute_words(0, wordifications, digit_arr[start+i:i+size], cleaned[start+i:])
+        size -= 1
+    results = [ string[:start]+"-"+slice for slice in wordifications ]
+    return results
+
+def permute_words(index, wordset, digitslice, base):
+    if len(digitslice) == 0:
+        return
+    for char in numpad[ base[index] ]:
+        print(char, index, len(digitslice))
+        digitslice[index] = char[0]
+        if index >= len(digitslice) - 1:
+            testword = "".join(digitslice)
+            if testword in dictionary:
+                wordset.add(testword)
+        else:
+            permute_words(index+1, wordset, digitslice, base)
+
+
 
 def check_numberstring(string):
     """
@@ -125,23 +157,29 @@ def check_numberstring(string):
 
 def get_word_format(oldnum, newword):
     length = len(newword)
-    if length >= 5:
+    #if length >= 5:
         # 0123456789ABCD
         # 1-800-724-6837
         # 1-800-PAI^NTER
         # 1-800-72-INTER
-        length += 1
+        #length += 1
     slice_index = len(oldnum) - length
-    return oldnum[:slice_index]+"-"+newword
+    sliced = oldnum[:slice_index]
+    result = ""
+    for i in range(len(sliced)):
+        if i == 1 or i == 4 or i == 7:
+            result += "-"
+        result += sliced[i]
+    return result+"-"+newword
 
 running = True
 while running:
     try:
-        inp = input("Which function would you like to use:\n\t(A) Number to Words\n\t(B) Words to Number\n\t(C) All Wordsification\n").lower()
+        inp = input("Which function would you like to use:\n\t(A) Number to Words\n\t(B) Words to Number\n\t(C) All Wordsification\n").lower().strip()
         number = ""
         if inp == "a" or inp == "c":
             #get number
-            valid = input("Input a US phone number (format: 1-XXX-XXX-XXXX): ")
+            valid = input("Input a US phone number (format: 1-XXX-XXX-XXXX): ").strip()
             if inp == "a":
                 word = number_to_words(valid)
                 print(word)
@@ -150,13 +188,13 @@ while running:
                 print(all_words)
         elif inp == "b":
             #get numwords
-            valid = input("Input a US phone number with numbers replaced with letters (e.g. 1-800-PAINTER): ")
+            valid = input("Input a US phone number with numbers replaced with letters (e.g. 1-800-PAINTER): ").strip()
             #valid = check_numwordstring(number)
             numbers = words_to_numbers(valid)
             print(numbers)
         in_input_cycle = True
         while in_input_cycle:
-            doContinue = input("Do you wish to continue?(Y/N): ").lower()
+            doContinue = input("Do you wish to continue?(Y/N): ").lower().strip()
             if doContinue == "n" or doContinue == "no":
                 in_input_cycle = False
                 running = False
