@@ -7,8 +7,8 @@ with open("words_list.txt") as f:
         dictionary.add(line.rstrip())
 
 
-number_regex = r"1?-?\d{3}-?\d{3}-?\d{4}"
-numword_regex = r""
+number_regex = r"\+?1-?[\d]{10}"
+numword_regex = r"\+?1\-?\d{3}-?\w{7}"
 #frequencies courtesy of (http://phrontistery.info/ihlstats.html#table2)
 #and (https://en.wikipedia.org/wiki/Letter_frequency)
 numpad = { "2": [("A", 7.93, 6.31, 8.497), ("B", 3.86, 0.15, 1.492), ("C", 8.50, 5.07, 2.202)]}
@@ -43,20 +43,20 @@ num_lookup["X"] = "9"
 num_lookup["Y"] = "9"
 num_lookup["Z"] = "9"
 
-class InvalidNumberException(Exception):
-    def __init__(self, reason):
-        pass
+class InvalidNumberError(Exception):
+    def __init__(self, message):
+        self.message = message
 
 def number_to_words(number):
-    valid = check_numberstring(number)
-    peeled = valid[4:]
+    peeled = number[4:]
     global dictionary
     new_word = ""
     maxchances = 100
     running, chances, dash_count = (True, maxchances, 0)
     while running:
         if len(peeled) == 0:
-            print("\tWas unable to find a suitable solution. Please try again.\n")
+            print(("\tTimed out: was unable to find a suitable solution. "
+            "Please try again."))
             return ""
         for i in range(len(peeled)):
             digit = peeled[i]
@@ -69,7 +69,12 @@ def number_to_words(number):
             #print(*random_letter)
             new_word += random_letter[0]
         #print(new_word)
-        if new_word not in dictionary:
+        split = re.compile(r"[A-Z]+").findall(new_word)
+        isWord = len(split) > 0
+        #print("SPLIT: ", split, "\tTESTWORD: ", testword)
+        for word in split:
+            isWord = isWord and word in dictionary
+        if not isWord:
             chances -= 1
             new_word = ""
             if chances == 0:
@@ -78,15 +83,15 @@ def number_to_words(number):
                 peeled = peeled[1:]
             continue
         else:
-            end = get_word_format(valid, new_word)
+            end = get_word_format(number, new_word)
             return end
 
 def get_relative_freq(base, tuple_list, index, length):
     """
-    On 25% chance returns the base digit, else returns one of the possible
+    On 1% chance returns the base digit, else returns one of the possible
     letters that the digit could correspond to on a telephone numpad.
     """
-    if random() <= 0.25:
+    if random() <= 0.01:
         return base
     else:
         set = None
@@ -165,18 +170,20 @@ def all_wordifications(string):
     #results = [ string[:start]+"-"+slice for slice in wordifications ]
     return wordifications
 
-
-
-def check_numberstring(string):
+def check(isNumber, string):
     """
     Checks if the parameter is valid and returns it with all dashes out
     """
-    match = re.search(number_regex, string)
-    if match is None:
+    match = None
+    if isNumber == True:
+        match = re.search(number_regex, string)
+    elif isNumber == False:
         match = re.search(numword_regex, string)
-        if match is None:
-            raise InvalidNumberException("Wasn't provided a valid number")
-    matched_group = match.group()
+    else:
+        raise RuntimeError("\tError: Parameter passed wasn't of boolean type.")
+    if match is None:
+        raise InvalidNumberError("\tError: Wasn't provided a valid number.")
+    matched_group = match.group().upper()
     return re.sub("-", "", matched_group)
 
 def get_word_format(oldnum, newword):
@@ -196,33 +203,66 @@ def get_word_format(oldnum, newword):
         result += sliced[i]
     return result+"-"+newword
 
-running = True
-while running:
-    try:
-        inp = input("Which function would you like to use:\n\t(A) Number to Words\n\t(B) Words to Number\n\t(C) All Wordsification\n").lower().strip()
-        number = ""
-        if inp == "a" or inp == "c":
-            #get number
-            valid = input("Input a US phone number (format: 1-XXX-XXX-XXXX): ").strip()
-            if inp == "a":
-                word = number_to_words(valid)
-                print(word)
-            elif inp == "c":
-                all_words = all_wordifications(valid)
-                print(all_words)
-        elif inp == "b":
-            #get numwords
-            valid = input("Input a US phone number with numbers replaced with letters (e.g. 1-800-PAINTER): ").strip()
-            #valid = check_numwordstring(number)
-            numbers = words_to_numbers(valid)
-            print(numbers)
-        in_input_cycle = True
-        while in_input_cycle:
-            doContinue = input("Do you wish to continue?(Y/N): ").lower().strip()
-            if doContinue == "n" or doContinue == "no":
-                in_input_cycle = False
-                running = False
-            elif doContinue == "y" or doContinue == "yes":
-                in_input_cycle = False
-    except InvalidNumberException:
-        print("That is not a valid number.")
+def main(option=None, phoneNumber=None, isTest=False):
+    if isTest:
+        assert option is not None and phoneNumber is not None
+        assert option == "a" or option == "b" or option == "c"
+        try:
+            inp = option
+            if inp == "a" or inp == "c":
+                valid = check(isNumber=True, string=phoneNumber)
+                if inp == "a":
+                    return number_to_words(valid)
+                elif inp == "c":
+                    return all_wordifications(valid)
+            elif inp == "b":
+                valid = check(isNumber=False, string=phoneNumber)
+                return words_to_numbers(valid)
+        except InvalidNumberError as ine_arg:
+            print(ine_arg)
+        except RuntimeError as re_arg:
+            print(re_arg)
+    else:
+        running = True
+        while running:
+            try:
+                query = """Which function would you like to use:
+                (A) Number to Words
+                (B) Words to Number
+                (C) All Wordsification\n"""
+                inp = input(query).lower().strip()
+                number = ""
+                if inp == "a" or inp == "c":
+                    #get number
+                    number = input(("Input a US phone number "
+                    "(format: 1-XXXXXXXXXX): ")).strip()
+                    valid = check(isNumber=True, string=number)
+                    if inp == "a":
+                        word = number_to_words(valid)
+                        print(word)
+                    elif inp == "c":
+                        all_words = all_wordifications(valid)
+                        print(all_words)
+                elif inp == "b":
+                    #get numwords
+                    number = input(("Input a US phone number with numbers "
+                    "replaced with letters (e.g. 1-800PAINTER): ")).strip()
+                    valid = check(isNumber=False, string=number)
+                    numbers = words_to_numbers(valid)
+                    print(numbers)
+                in_input_cycle = True
+                while in_input_cycle:
+                    doContinue = input(("Do you wish to continue?"
+                    "(Y/N): ")).lower().strip()
+                    if doContinue == "n" or doContinue == "no":
+                        in_input_cycle = False
+                        running = False
+                    elif doContinue == "y" or doContinue == "yes":
+                        in_input_cycle = False
+            except InvalidNumberError as ine_arg:
+                print(ine_arg)
+            except RuntimeError as re_arg:
+                print(re_arg)
+
+if __name__ == "__main__":
+    main()
