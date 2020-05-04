@@ -1,9 +1,10 @@
 import re
-from random import choices
+from random import choices, random
 
-dictionary = []
+dictionary = set()
 with open("words_list.txt") as f:
-    dictionary = [line.rstrip() for line in f]
+    for line in f:
+        dictionary.add(line.rstrip())
 
 
 number_regex = r"1?-?\d{3}-?\d{3}-?\d{4}"
@@ -18,8 +19,8 @@ numpad["6"] = [("M", 5.90, 6.95, 2.406), ("N", 2.28, 8.26, 2.406), ("O", 3.38, 0
 numpad["7"] = [("P", 11.53, 0.46, 1.929), ("Q", 1.56, 0, 0.095), ("R", 3.43, 6.01, 7.587), ("S", 10.45, 12.51, 6.327)]
 numpad["8"] = [("T", 6.14, 7.22, 9.356), ("U", 1.21, 0.22, 2.758), ("V", 2.66, 0, 0.978)]
 numpad["9"] = [("W", 1.93, 0.28, 2.560), ("X", 0.61, 0.39, 0.150), ("Y", 0.48, 12.79, 1.994), ("Z", 1.43, 0.03, 0.077)]
-numpad["1"] = [("-1-", 1, 1, 1)]
-numpad["0"] = [("-0-", 1, 1, 1)]
+numpad["1"] = [("1", 1, 1, 1)]
+numpad["0"] = [("0", 1, 1, 1)]
 
 num_lookup = {"A": "2", "B": "2", "C": "2", "D": "3", "E": "3", "F": "3", "G": "4"}
 num_lookup["H"] = "4"
@@ -63,7 +64,7 @@ def number_to_words(number):
                 dash_count += 1
                 continue
             list = numpad[digit]
-            result = get_relative_freq(list, i, len(peeled))
+            result = get_relative_freq(digit, list, i, len(peeled))
             random_letter = result
             #print(*random_letter)
             new_word += random_letter[0]
@@ -80,16 +81,23 @@ def number_to_words(number):
             end = get_word_format(valid, new_word)
             return end
 
-def get_relative_freq(tuple_list, index, length):
-    set = None
-    if index == 0:
-        set = [(letter, start) for letter, start, end, contain in tuple_list]
-    elif index == length-1:
-        set = [(letter, end) for letter, start, end, contain in tuple_list]
+def get_relative_freq(base, tuple_list, index, length):
+    """
+    On 25% chance returns the base digit, else returns one of the possible
+    letters that the digit could correspond to on a telephone numpad.
+    """
+    if random() <= 0.25:
+        return base
     else:
-        set = [(letter, contain) for letter, start, end, contain in tuple_list]
-    letters, freqs = zip(*set)
-    return choices(letters, weights=freqs)
+        set = None
+        if index == 0:
+            set = [(letter, start) for letter, start, end, contain in tuple_list]
+        elif index == length-1:
+            set = [(letter, end) for letter, start, end, contain in tuple_list]
+        else:
+            set = [(letter, contain) for letter, start, end, contain in tuple_list]
+        letters, freqs = zip(*set)
+        return choices(letters, weights=freqs)
 
 def words_to_numbers(worded_number):
     #put check to confirm input is valid
@@ -114,32 +122,48 @@ def all_wordifications(string):
     wordifications = set()
     #array of (index, char) tuples
     cleaned = re.sub("-", "", string)
-    digit_arr = [ char for char in cleaned ]
-    print(digit_arr)
+    digit_arr = [ [i, cleaned[i]] for i in range(len(cleaned)) ]
+    #print(digit_arr)
     #iterate through list and
     start = 4
     end = len(digit_arr)
     size = end
+    def permute_words(index, digitslice, base):
+        nonlocal size, wordifications, cleaned
+        if len(digitslice) == 0:
+            return
+        options = numpad[ base[index] ][:]
+        #print("numpad print: ", options)
+        #print("digit: ", base[index])
+        options.insert(0, (base[index],))
+        #print("OPTIONS: ", options)
+        for char in options:
+            #print(char, index, len(digitslice))
+            digitslice[index][1] = char[0]
+            if index >= len(digitslice) - 1:
+                testword = "".join([digitslice[i][1] for i in range(len(digitslice))])
+                split = re.compile(r"[A-Z]+").findall(testword)
+                isWord = len(split) > 0
+                #print("SPLIT: ", split, "\tTESTWORD: ", testword)
+                for word in split:
+                    isWord = isWord and word in dictionary
+                if isWord:
+                    modified = [char for char in cleaned]
+                    for digit in digitslice:
+                        modified[digit[0]] = digit[1]
+                    wordifications.add("".join(modified))
+                    #start = digitslice[0][0]
+                    #wordifications.add(cleaned[:start]+"-"+testword+"-"+cleaned[start+size:])
+            else:
+                permute_words(index+1, digitslice, base)
+
     while size > 0:
         rangefinder = end - size + 1
         for i in range(rangefinder):
-            permute_words(0, wordifications, digit_arr[start+i:i+size], cleaned[start+i:])
+            permute_words(0, digit_arr[start+i:i+size], cleaned[start+i:])
         size -= 1
-    results = [ string[:start]+"-"+slice for slice in wordifications ]
-    return results
-
-def permute_words(index, wordset, digitslice, base):
-    if len(digitslice) == 0:
-        return
-    for char in numpad[ base[index] ]:
-        print(char, index, len(digitslice))
-        digitslice[index] = char[0]
-        if index >= len(digitslice) - 1:
-            testword = "".join(digitslice)
-            if testword in dictionary:
-                wordset.add(testword)
-        else:
-            permute_words(index+1, wordset, digitslice, base)
+    #results = [ string[:start]+"-"+slice for slice in wordifications ]
+    return wordifications
 
 
 
