@@ -7,8 +7,8 @@ with open("words_list.txt") as f:
         dictionary.add(line.rstrip())
 
 
-number_regex = r"\+?1-?[\d]{10}"
-numword_regex = r"\+?1\-?\d{3}-?\w{7}"
+number_regex = r"\+?1-?\d{3}-?\d{3}-?\d{4}"
+numword_regex = r"\+?1-?\d{3}-?\w{7}"
 #frequencies courtesy of (http://phrontistery.info/ihlstats.html#table2)
 #and (https://en.wikipedia.org/wiki/Letter_frequency)
 numpad = { "2": [("A", 7.93, 6.31, 8.497), ("B", 3.86, 0.15, 1.492), ("C", 8.50, 5.07, 2.202)]}
@@ -184,7 +184,7 @@ def check(isNumber, string):
     if match is None:
         raise InvalidNumberError("\tError: Wasn't provided a valid number.")
     matched_group = match.group().upper()
-    return re.sub("-", "", matched_group)
+    return re.sub("[+-]", "", matched_group)
 
 def get_word_format(oldnum, newword):
     length = len(newword)
